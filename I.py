@@ -1,0 +1,81 @@
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
+
+def median_filter_salt_and_pepper(image, kernel_size):
+  if kernel_size % 2 == 0:
+    raise ValueError("Kernel size must be an odd integer.")
+
+  # Apply median filter
+  filtered_image = cv2.medianBlur(image, kernel_size)
+  return filtered_image
+
+# Görüntüyü yükle
+original_img = cv2.imread('I.png')
+original_img = median_filter_salt_and_pepper(original_img,5)
+if original_img is None:
+    raise FileNotFoundError("Image 'I.jpg' could not be loaded. Check the file path or file integrity.")
+
+print("Image shape:", original_img.shape, "dtype:", original_img.dtype)
+
+# Gri tonlama ve gürültü azaltma
+gray = cv2.cvtColor(original_img, cv2.COLOR_BGR2GRAY)
+plt.imshow(gray,cmap='gray')
+plt.title('Gri Tonlama ve Gürültü Azaltma')
+plt.axis('off')
+plt.show()
+
+# Gauss
+gauss = cv2.GaussianBlur(gray, (5, 5), 3)
+plt.imshow(gauss, cmap='gray')
+plt.title("Gauss")
+plt.axis('off')
+plt.show()
+
+# Canny kenar tespiti
+edges = cv2.Canny(gauss, 40, 80)
+
+# Canny çıktısını görselleştir
+plt.imshow(edges, cmap='gray')
+plt.axis('off')
+plt.show()
+
+# Konturları bul
+contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+print("Tespit edilen kontur sayısı:", len(contours))
+
+# Tüm konturları görselleştir
+temp_img = original_img.copy()
+plt.imshow(cv2.drawContours(gray, contours, -1, (0, 255, 0), 3), cmap="gray")
+plt.axis('off')
+plt.show()
+
+# Plaka adaylarını filtrele
+plate_candidates = []
+for contour in contours:
+    x, y, w, h = cv2.boundingRect(contour)
+    aspect_ratio = w / float(h)
+    area = cv2.contourArea(contour)
+    print(f"Alan: {area}, En-Boy Oranı: {aspect_ratio}")
+
+    if (area > 500 and area < 100000) and (aspect_ratio > 1.5 and aspect_ratio < 6):
+        plate_candidates.append(contour)
+
+        # Kontur için maske
+        mask = np.zeros_like(original_img)
+        cv2.drawContours(mask, [contour], -1, (255, 255, 255), thickness=cv2.FILLED)
+
+        # Gauss bulanıklığı uygula
+        blurred = cv2.GaussianBlur(original_img, (25, 25), 30)
+
+        # Bulanıklaştırılmış alanı yalnızca maskenin beyaz olduğu yerlerde birleştir
+        original_img = np.where(mask == 255, blurred, original_img)
+
+
+print("Plaka adayı sayısı:", len(plate_candidates))
+
+# Sonuçları göster
+original_img_rgb = cv2.cvtColor(original_img, cv2.COLOR_RGB2BGR)
+plt.imshow(original_img_rgb)
+plt.axis('off')
+plt.show()
